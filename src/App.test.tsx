@@ -27,30 +27,30 @@ describe('Aura Mental Wellness Tracker - App Component Tests', () => {
     render(<App />);
     
     // Default tab is dashboard
-    expect(screen.getByRole('tabpanel', { id: 'dashboard-tabpanel' })).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'dashboard-tabpanel');
     
     // Navigate to Journal
     const journalTab = screen.getByRole('tab', { name: /Journal & Log/i });
     fireEvent.click(journalTab);
-    expect(screen.getByRole('tabpanel', { id: 'journal-tabpanel' })).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'journal-tabpanel');
     expect(screen.getByText(/Open-Ended Daily Journal/i)).toBeInTheDocument();
     
     // Navigate to Chat
     const chatTab = screen.getByRole('tab', { name: /Aura Companion/i });
     fireEvent.click(chatTab);
-    expect(screen.getByRole('tabpanel', { id: 'chat-tabpanel' })).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'chat-tabpanel');
     expect(screen.getByText(/Chat with Aura/i)).toBeInTheDocument();
     
     // Navigate to Mindfulness
     const mindfulnessTab = screen.getByRole('tab', { name: /Mindfulness/i });
     fireEvent.click(mindfulnessTab);
-    expect(screen.getByRole('tabpanel', { id: 'mindfulness-tabpanel' })).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'mindfulness-tabpanel');
     expect(screen.getByText(/Interactive Box Breathing/i)).toBeInTheDocument();
     
     // Navigate to Settings
     const settingsTab = screen.getByRole('tab', { name: /Settings/i });
     fireEvent.click(settingsTab);
-    expect(screen.getByRole('tabpanel', { id: 'settings-tabpanel' })).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'settings-tabpanel');
     expect(screen.getByText(/Settings & Data Integrity/i)).toBeInTheDocument();
   });
 
