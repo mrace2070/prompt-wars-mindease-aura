@@ -7,10 +7,7 @@ function getGeminiUrl(): string {
   return `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_MODEL}:generateContent`;
 }
 
-export async function checkApiKeyValidity(
-  _apiKey?: string,
-  _model?: string
-): Promise<{ isValid: boolean; error?: string }> {
+export async function checkApiKeyValidity(): Promise<{ isValid: boolean; error?: string }> {
   if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_API_KEY') || GEMINI_API_KEY.trim() === '') {
     return { isValid: false, error: 'API key is missing or not set in environment variables.' };
   }
@@ -35,28 +32,27 @@ export async function checkApiKeyValidity(
           isValid: false, 
           error: `API Error (${response.status}): ${apiErrorMessage}` 
         };
-      } catch (e) {
+      } catch {
         return { 
           isValid: false, 
           error: `HTTP Error ${response.status}: ${response.statusText}` 
         };
       }
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
     console.error('Validation fetch error:', e);
     return { 
       isValid: false, 
-      error: `Network Error: Could not connect to Google API. Check your internet connection, or try disabling privacy adblockers/VPNs.` 
+      error: `Network Error: Could not connect to Google API. ${errorMsg}` 
     };
   }
 }
 
 export async function analyzeJournalEntry(
-  _apiKey?: string,
   text: string = '',
   mood: string = 'neutral',
-  examType: string = 'JEE',
-  _model?: string
+  examType: string = 'JEE'
 ): Promise<JournalAnalysis> {
   if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_API_KEY') || GEMINI_API_KEY.trim() === '') {
     console.warn('Gemini API key is not configured. Falling back to mock analysis.');
@@ -118,11 +114,9 @@ The JSON output MUST match this structure exactly:
 }
 
 export async function getCompanionResponse(
-  _apiKey?: string,
   chatHistory: Message[] = [],
   recentEntries: MoodEntry[] = [],
-  examType: string = 'JEE',
-  _model?: string
+  examType: string = 'JEE'
 ): Promise<string> {
   if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_API_KEY') || GEMINI_API_KEY.trim() === '') {
     console.warn('Gemini API key is not configured. Falling back to default companion response.');
@@ -173,11 +167,9 @@ If they express high-stress or self-harm thoughts, provide a gentle, supportive 
 }
 
 export async function generateMindfulnessExercise(
-  _apiKey?: string,
   mood: string = 'neutral',
   triggers: string[] = [],
-  examType: string = 'JEE',
-  _model?: string
+  examType: string = 'JEE'
 ): Promise<MindfulnessExercise> {
   if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_API_KEY') || GEMINI_API_KEY.trim() === '') {
     console.warn('Gemini API key is not configured. Falling back to mock exercise.');

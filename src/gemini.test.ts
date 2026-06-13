@@ -55,7 +55,7 @@ describe('Gemini Client Wrapper Tests', () => {
         })
       });
 
-      const result = await analyzeJournalEntry('mock-key', 'I feel good', 'good', 'JEE');
+      const result = await analyzeJournalEntry('I feel good', 'good', 'JEE');
       expect(result.sentiment).toBe("Highly focused");
       expect(result.stressLevel).toBe(3);
       expect(result.dominantEmotions).toContain("Focus");
@@ -63,7 +63,7 @@ describe('Gemini Client Wrapper Tests', () => {
 
     it('should fall back to mock analysis if fetch fails or throws error', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network failure'));
-      const result = await analyzeJournalEntry('mock-key', 'I feel bad', 'anxious', 'JEE');
+      const result = await analyzeJournalEntry('I feel bad', 'anxious', 'JEE');
       expect(result.stressLevel).toBe(8); // Anxious mood fallback is 8
       expect(result.dominantEmotions).toContain('Anxiety');
     });
@@ -82,13 +82,13 @@ describe('Gemini Client Wrapper Tests', () => {
         })
       });
 
-      const result = await getCompanionResponse('mock-key', [], [], 'JEE');
+      const result = await getCompanionResponse([], [], 'JEE');
       expect(result).toBe("Hello! I am Aura.");
     });
 
     it('should return fallback message if fetch fails or throws error', async () => {
       mockFetch.mockRejectedValueOnce(new Error('API Error'));
-      const result = await getCompanionResponse('mock-key', [], [], 'JEE');
+      const result = await getCompanionResponse([], [], 'JEE');
       expect(result).toContain("standing by you");
       expect(result).toContain("deep breath");
     });
@@ -114,14 +114,14 @@ describe('Gemini Client Wrapper Tests', () => {
         })
       });
 
-      const result = await generateMindfulnessExercise('mock-key', 'neutral', [], 'JEE');
+      const result = await generateMindfulnessExercise('neutral', [], 'JEE');
       expect(result.title).toBe("Mindful Breathing");
       expect(result.steps).toContain("Step 1");
     });
 
     it('should fall back to mock exercise if fetch fails or throws error', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Fetch error'));
-      const result = await generateMindfulnessExercise('mock-key', 'anxious', [], 'JEE');
+      const result = await generateMindfulnessExercise('anxious', [], 'JEE');
       expect(result.title).toContain("5-4-3-2-1 Technique"); // Anxious mood fallback is grounding 5-4-3-2-1
     });
   });

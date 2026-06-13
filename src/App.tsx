@@ -142,13 +142,17 @@ const sanitizeInput = (val: string): string => {
     .replace(/\//g, '&#x2F;');
 };
 
+let idCounter = 0;
+const getNextId = (prefix: string): string => {
+  idCounter += 1;
+  return `${prefix}-${idCounter}`;
+};
+
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'journal' | 'chat' | 'mindfulness' | 'settings'>('dashboard');
 
   // Core Data States (persisted in localStorage)
-  const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
-  const selectedModel = 'gemini-3.5-flash';
 
   const [examType, setExamType] = useState<string>(() => localStorage.getItem('aura_exam_type') || 'JEE');
 
@@ -180,7 +184,7 @@ export default function App() {
   const [breathingActive, setBreathingActive] = useState(false);
   const [breathPhase, setBreathPhase] = useState<'Inhale' | 'Hold' | 'Exhale' | 'Hold Empty'>('Inhale');
   const [breathCountdown, setBreathCountdown] = useState(4);
-  const breathingTimerRef = useRef<any>(null);
+  const breathingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Modal State for Mindfulness Exercises
   const [activeExerciseModal, setActiveExerciseModal] = useState<MindfulnessExercise | null>(null);
@@ -210,6 +214,17 @@ export default function App() {
     }
   }, [chatMessages, activeTab]);
 
+  const handleToggleBreathing = () => {
+    setBreathingActive(prev => {
+      const nextActive = !prev;
+      if (!nextActive) {
+        setBreathCountdown(4);
+        setBreathPhase('Inhale');
+      }
+      return nextActive;
+    });
+  };
+
   // Breathing Cycle Logic
   useEffect(() => {
     if (breathingActive) {
@@ -232,12 +247,17 @@ export default function App() {
         });
       }, 1000);
     } else {
-      clearInterval(breathingTimerRef.current);
-      setBreathCountdown(4);
-      setBreathPhase('Inhale');
+      if (breathingTimerRef.current) {
+        clearInterval(breathingTimerRef.current);
+        breathingTimerRef.current = null;
+      }
     }
 
-    return () => clearInterval(breathingTimerRef.current);
+    return () => {
+      if (breathingTimerRef.current) {
+        clearInterval(breathingTimerRef.current);
+      }
+    };
   }, [breathingActive]);
 
   // API key is hardcoded directly in the source code
@@ -250,10 +270,10 @@ export default function App() {
     setIsAnalyzing(true);
     try {
       const sanitizedText = sanitizeInput(journalText);
-      const analysisResult = await analyzeJournalEntry(apiKey, sanitizedText, selectedMood, examType, selectedModel);
+      const analysisResult = await analyzeJournalEntry(sanitizedText, selectedMood, examType);
       
       const newEntry: MoodEntry = {
-        id: `entry-${Date.now()}`,
+        id: getNextId('entry'),
         date: new Date().toISOString().split('T')[0],
         mood: selectedMood,
         journalText: sanitizedText,
@@ -279,7 +299,7 @@ export default function App() {
     const sanitizedText = sanitizeInput(messageText);
 
     const newUserMsg: Message = {
-      id: `msg-${Date.now()}`,
+      id: getNextId('msg'),
       sender: 'user',
       text: sanitizedText,
       timestamp: new Date().toISOString()
@@ -292,10 +312,10 @@ export default function App() {
       // Get recent journals to supply context to AI
       const recentJournals = moodEntries.slice(0, 3);
       const updatedHistory = [...chatMessages, newUserMsg];
-      const botResponse = await getCompanionResponse(apiKey, updatedHistory, recentJournals, examType, selectedModel);
+      const botResponse = await getCompanionResponse(updatedHistory, recentJournals, examType);
 
       const newBotMsg: Message = {
-        id: `msg-${Date.now() + 1}`,
+        id: getNextId('msg'),
         sender: 'aura',
         text: botResponse,
         timestamp: new Date().toISOString()
@@ -322,11 +342,11 @@ export default function App() {
         )
       );
 
-      const response = await generateMindfulnessExercise(apiKey, selectedMood, recentTriggers, examType, selectedModel);
+      const response = await generateMindfulnessExercise(selectedMood, recentTriggers, examType);
       
       const newExercise: MindfulnessExercise = {
         ...response,
-        id: `ex-${Date.now()}`
+        id: getNextId('ex')
       };
 
       setCustomExercises(prev => [newExercise, ...prev]);
@@ -992,7 +1012,7 @@ export default function App() {
               </div>
 
               <button 
-                onClick={() => setBreathingActive(!breathingActive)}
+                onClick={handleToggleBreathing}
                 className="primary-btn"
                 style={{ width: '180px' }}
                 aria-label={breathingActive ? "Stop box breathing guide" : "Start box breathing guide"}

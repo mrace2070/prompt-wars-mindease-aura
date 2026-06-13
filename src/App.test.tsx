@@ -13,7 +13,7 @@ beforeAll(() => {
       ok: true,
       json: () => Promise.resolve({ candidates: [{ content: { parts: [{ text: "Mock response" }] } }] })
     })
-  ) as any;
+  ) as unknown as typeof globalThis.fetch;
 });
 
 describe('Aura Mental Wellness Tracker - App Component Tests', () => {
