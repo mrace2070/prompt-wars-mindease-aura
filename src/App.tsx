@@ -132,6 +132,16 @@ const INITIAL_EXERCISES: MindfulnessExercise[] = [
   }
 ];
 
+const sanitizeInput = (val: string): string => {
+  return val
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+};
+
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'journal' | 'chat' | 'mindfulness' | 'settings'>('dashboard');
@@ -139,6 +149,8 @@ export default function App() {
   // Core Data States (persisted in localStorage)
   const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
   const selectedModel = 'gemini-3.5-flash';
+
+  const [examType, setExamType] = useState<string>(() => localStorage.getItem('aura_exam_type') || 'JEE');
 
   const [moodEntries, setMoodEntries] = useState<MoodEntry[]>(() => {
     const stored = localStorage.getItem('aura_mood_entries');
@@ -187,6 +199,10 @@ export default function App() {
     localStorage.setItem('aura_custom_exercises', JSON.stringify(customExercises));
   }, [customExercises]);
 
+  useEffect(() => {
+    localStorage.setItem('aura_exam_type', examType);
+  }, [examType]);
+
   // Scroll to bottom of chat
   useEffect(() => {
     if (activeTab === 'chat') {
@@ -233,13 +249,14 @@ export default function App() {
 
     setIsAnalyzing(true);
     try {
-      const analysisResult = await analyzeJournalEntry(apiKey, journalText, selectedMood, selectedModel);
+      const sanitizedText = sanitizeInput(journalText);
+      const analysisResult = await analyzeJournalEntry(apiKey, sanitizedText, selectedMood, examType, selectedModel);
       
       const newEntry: MoodEntry = {
         id: `entry-${Date.now()}`,
         date: new Date().toISOString().split('T')[0],
         mood: selectedMood,
-        journalText,
+        journalText: sanitizedText,
         analysis: analysisResult
       };
 
@@ -259,11 +276,12 @@ export default function App() {
     if (!messageText.trim()) return;
 
     if (!textToSend) setChatInput('');
+    const sanitizedText = sanitizeInput(messageText);
 
     const newUserMsg: Message = {
       id: `msg-${Date.now()}`,
       sender: 'user',
-      text: messageText,
+      text: sanitizedText,
       timestamp: new Date().toISOString()
     };
 
@@ -274,7 +292,7 @@ export default function App() {
       // Get recent journals to supply context to AI
       const recentJournals = moodEntries.slice(0, 3);
       const updatedHistory = [...chatMessages, newUserMsg];
-      const botResponse = await getCompanionResponse(apiKey, updatedHistory, recentJournals, selectedModel);
+      const botResponse = await getCompanionResponse(apiKey, updatedHistory, recentJournals, examType, selectedModel);
 
       const newBotMsg: Message = {
         id: `msg-${Date.now() + 1}`,
@@ -304,7 +322,7 @@ export default function App() {
         )
       );
 
-      const response = await generateMindfulnessExercise(apiKey, selectedMood, recentTriggers, selectedModel);
+      const response = await generateMindfulnessExercise(apiKey, selectedMood, recentTriggers, examType, selectedModel);
       
       const newExercise: MindfulnessExercise = {
         ...response,
@@ -391,41 +409,61 @@ export default function App() {
       {/* Header */}
       <header className="app-header">
         <div className="logo-section">
-          <Brain className="logo-icon" size={32} />
+          <Brain className="logo-icon" size={32} aria-hidden="true" />
           <h1 className="logo-text">Aura</h1>
-          <span className="exam-badge">COMPETITIVE EXAM WELLNESS</span>
+          <span className="exam-badge" aria-label={`Competitive Exam Wellness Companion - Target Exam is ${examType}`}>{examType} EXAM WELLNESS</span>
         </div>
         
-        <nav className="app-nav">
+        <nav className="app-nav" role="tablist" aria-label="Aura Companion Navigation">
           <button 
+            id="dashboard-tab"
+            role="tab"
+            aria-selected={activeTab === 'dashboard'}
+            aria-controls="dashboard-tabpanel"
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('dashboard')}
           >
-            <Activity size={16} /> Dashboard
+            <Activity size={16} aria-hidden="true" /> Dashboard
           </button>
           <button 
+            id="journal-tab"
+            role="tab"
+            aria-selected={activeTab === 'journal'}
+            aria-controls="journal-tabpanel"
             className={`nav-item ${activeTab === 'journal' ? 'active' : ''}`}
             onClick={() => setActiveTab('journal')}
           >
-            <Sparkles size={16} /> Journal & Log
+            <Sparkles size={16} aria-hidden="true" /> Journal & Log
           </button>
           <button 
+            id="chat-tab"
+            role="tab"
+            aria-selected={activeTab === 'chat'}
+            aria-controls="chat-tabpanel"
             className={`nav-item ${activeTab === 'chat' ? 'active' : ''}`}
             onClick={() => setActiveTab('chat')}
           >
-            <MessageCircle size={16} /> Aura Companion
+            <MessageCircle size={16} aria-hidden="true" /> Aura Companion
           </button>
           <button 
+            id="mindfulness-tab"
+            role="tab"
+            aria-selected={activeTab === 'mindfulness'}
+            aria-controls="mindfulness-tabpanel"
             className={`nav-item ${activeTab === 'mindfulness' ? 'active' : ''}`}
             onClick={() => setActiveTab('mindfulness')}
           >
-            <Compass size={16} /> Mindfulness
+            <Compass size={16} aria-hidden="true" /> Mindfulness
           </button>
           <button 
+            id="settings-tab"
+            role="tab"
+            aria-selected={activeTab === 'settings'}
+            aria-controls="settings-tabpanel"
             className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
           >
-            <SettingsIcon size={16} /> Settings
+            <SettingsIcon size={16} aria-hidden="true" /> Settings
           </button>
         </nav>
       </header>
@@ -437,12 +475,49 @@ export default function App() {
         
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
-          <div className="dashboard-grid">
+          <div role="tabpanel" id="dashboard-tabpanel" aria-labelledby="dashboard-tab" className="dashboard-grid">
             <div className="dashboard-left">
               
+              {/* Target Exam Context Selector */}
+              <div className="glass-card" style={{ padding: '1.25rem' }}>
+                <h3 className="card-title" style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem' }}>
+                  <Brain size={18} className="logo-icon" style={{ animation: 'none' }} aria-hidden="true" />
+                  Target Competitive Exam Context
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  Aura customizes your mood analysis, hidden triggers, and digital coping strategies for:
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {['JEE', 'NEET', 'UPSC', 'GATE', 'CAT', 'CUET', 'Board Exams'].map((exam) => (
+                    <button
+                      key={exam}
+                      type="button"
+                      onClick={() => setExamType(exam)}
+                      className={`mood-btn ${examType === exam ? 'active' : ''}`}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        fontSize: '0.8rem',
+                        borderRadius: 'var(--radius-sm)',
+                        flex: '1 1 0px',
+                        minWidth: '70px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        border: examType === exam ? '1px solid var(--color-primary-light)' : '1px solid var(--border-color)',
+                        background: examType === exam ? 'var(--color-primary-glow)' : 'rgba(255, 255, 255, 0.02)',
+                        color: examType === exam ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {exam}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Daily Motivation Card */}
               <div className="tips-banner">
-                <Heart className="tips-icon" size={24} />
+                <Heart className="tips-icon" size={24} aria-hidden="true" />
                 <div className="tips-content">
                   <span className="tips-title">Aura's Reminder For You Today</span>
                   <span className="tips-body">
@@ -457,7 +532,7 @@ export default function App() {
                 <div className="metric-card">
                   <div className="metric-header">
                     Average Stress
-                    <Activity size={14} className="text-secondary" />
+                    <Activity size={14} className="text-secondary" aria-hidden="true" />
                   </div>
                   <div className="metric-value" style={{ 
                     color: averageStress > 7 ? 'var(--color-danger)' : averageStress > 4 ? 'var(--color-warning)' : 'var(--color-success)' 
@@ -472,7 +547,7 @@ export default function App() {
                 <div className="metric-card">
                   <div className="metric-header">
                     Logged Entries
-                    <Calendar size={14} />
+                    <Calendar size={14} aria-hidden="true" />
                   </div>
                   <div className="metric-value">{moodEntries.length}</div>
                   <div className="metric-sub">Active journals logged</div>
@@ -530,7 +605,7 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="empty-state">
-                    <Activity className="empty-state-icon" />
+                    <Activity className="empty-state-icon" aria-hidden="true" />
                     <span>Not enough data yet. Log at least 2 entries in Journal to see trends.</span>
                   </div>
                 )}
@@ -592,7 +667,7 @@ export default function App() {
                     {moodEntries.map(e => (
                       <div key={e.id} className="history-item">
                         <div className="history-info">
-                          <span className="history-mood-indicator">
+                          <span className="history-mood-indicator" role="img" aria-label={e.mood}>
                             {e.mood === 'excellent' ? '😊' : e.mood === 'good' ? '🙂' : e.mood === 'neutral' ? '😐' : e.mood === 'anxious' ? '😰' : '😫'}
                           </span>
                           <div className="history-text-col">
@@ -614,13 +689,43 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* Crisis Support & Helplines Box */}
+              <div className="glass-card" style={{ border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.03)' }}>
+                <h3 className="card-title" style={{ color: '#f87171', fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Heart size={16} style={{ color: '#ef4444' }} aria-hidden="true" />
+                  Self-Care & Crisis Resources
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  If you are feeling extremely overwhelmed or experiencing a crisis, please reach out to professional services immediately. You are not alone:
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.25rem' }}>
+                    <span style={{ fontWeight: 600 }}>Kiran Mental Health:</span>
+                    <a href="tel:18005990019" style={{ color: 'var(--color-primary-light)', textDecoration: 'none' }}>1800-599-0019</a>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.25rem' }}>
+                    <span style={{ fontWeight: 600 }}>Tele-MANAS:</span>
+                    <a href="tel:14416" style={{ color: 'var(--color-primary-light)', textDecoration: 'none' }}>14416 or 1800-891-4416</a>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.25rem' }}>
+                    <span style={{ fontWeight: 600 }}>Vandrevala Foundation:</span>
+                    <a href="tel:+919999666555" style={{ color: 'var(--color-primary-light)', textDecoration: 'none' }}>+91-9999 666 555</a>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600 }}>SNEHA Suicide Prevention:</span>
+                    <a href="tel:+914424640050" style={{ color: 'var(--color-primary-light)', textDecoration: 'none' }}>+91-44-2464 0050</a>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
 
         {/* JOURNAL & LOG TAB */}
         {activeTab === 'journal' && (
-          <div className="journal-layout">
+          <div role="tabpanel" id="journal-tabpanel" aria-labelledby="journal-tab" className="journal-layout">
             {/* Journal entry form */}
             <div className="glass-card">
               <h3 className="card-title">Open-Ended Daily Journal</h3>
@@ -638,8 +743,9 @@ export default function App() {
                           type="button"
                           className={`mood-btn mood-${m} ${selectedMood === m ? 'active' : ''}`}
                           onClick={() => setSelectedMood(m)}
+                          aria-pressed={selectedMood === m}
                         >
-                          <span className="mood-emoji">{emojis[m]}</span>
+                          <span className="mood-emoji" role="img" aria-label={m}>{emojis[m]}</span>
                           <span className="mood-label">{m}</span>
                         </button>
                       );
@@ -666,11 +772,11 @@ export default function App() {
                 >
                   {isAnalyzing ? (
                     <>
-                      <div className="loading-spinner" /> Analyzing Triggers with AI...
+                      <div className="loading-spinner" aria-hidden="true" /> Analyzing Triggers with AI...
                     </>
                   ) : (
                     <>
-                      <Sparkles size={18} /> Analyze & Log Entry
+                      <Sparkles size={18} aria-hidden="true" /> Analyze & Log Entry
                     </>
                   )}
                 </button>
@@ -754,7 +860,7 @@ export default function App() {
                 </div>
               ) : (
                 <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
-                  <Sparkles className="empty-state-icon" style={{ fontSize: '3rem' }} />
+                  <Sparkles className="empty-state-icon" style={{ fontSize: '3rem' }} aria-hidden="true" />
                   <span>Submit a journal log on the left to uncover hidden stressors, cognitive distortions, and coping strategies.</span>
                 </div>
               )}
@@ -764,17 +870,17 @@ export default function App() {
 
         {/* CHAT TAB */}
         {activeTab === 'chat' && (
-          <div className="glass-card chat-layout">
+          <div role="tabpanel" id="chat-tabpanel" aria-labelledby="chat-tab" className="glass-card chat-layout">
             <h3 className="card-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', margin: 0 }}>
               Chat with Aura
             </h3>
             
             {/* Conversation */}
-            <div className="chat-history">
+            <div className="chat-history" aria-live="polite">
               {chatMessages.map(m => (
                 <div key={m.id} className={`chat-message ${m.sender}`}>
                   <div className="message-avatar">
-                    {m.sender === 'user' ? <User size={18} /> : <Brain size={18} />}
+                    {m.sender === 'user' ? <User size={18} aria-hidden="true" /> : <Brain size={18} aria-hidden="true" />}
                   </div>
                   <div className="message-bubble">
                     {m.text}
@@ -785,9 +891,9 @@ export default function App() {
               {isTyping && (
                 <div className="chat-message aura">
                   <div className="message-avatar">
-                    <Brain size={18} />
+                    <Brain size={18} aria-hidden="true" />
                   </div>
-                  <div className="message-bubble" style={{ padding: '0.4rem 0.8rem' }}>
+                  <div className="message-bubble" style={{ padding: '0.4rem 0.8rem' }} aria-label="Aura is typing">
                     <div className="bubble-loader">
                       <span></span>
                       <span></span>
@@ -843,13 +949,15 @@ export default function App() {
                 placeholder="Talk to Aura about exam stress, burnout, mock test fear..."
                 className="chat-input"
                 disabled={isTyping}
+                aria-label="Type your message to Aura"
               />
               <button 
                 onClick={() => handleSendChatMessage()} 
                 className="chat-submit-btn"
                 disabled={isTyping || !chatInput.trim()}
+                aria-label="Send message"
               >
-                <Send size={18} />
+                <Send size={18} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -857,7 +965,7 @@ export default function App() {
 
         {/* MINDFULNESS OASIS */}
         {activeTab === 'mindfulness' && (
-          <div className="mindfulness-layout">
+          <div role="tabpanel" id="mindfulness-tabpanel" aria-labelledby="mindfulness-tab" className="mindfulness-layout">
             
             {/* Breathing Circle Guide */}
             <div className="glass-card breathing-card">
@@ -866,7 +974,11 @@ export default function App() {
                 Used by Navy SEALs and students alike to instantly regulate cortisol and physical panic.
               </p>
               
-              <div className={`breathing-circle-outer ${breathingActive ? 'active' : ''}`}>
+              <div 
+                className={`breathing-circle-outer ${breathingActive ? 'active' : ''}`}
+                aria-live="polite"
+                aria-label={breathingActive ? `Breathing exercise active: ${breathPhase} for ${breathCountdown} seconds` : "Breathing exercise inactive"}
+              >
                 <div className="breathing-circle-inner">
                   {breathingActive ? (
                     <>
@@ -883,14 +995,15 @@ export default function App() {
                 onClick={() => setBreathingActive(!breathingActive)}
                 className="primary-btn"
                 style={{ width: '180px' }}
+                aria-label={breathingActive ? "Stop box breathing guide" : "Start box breathing guide"}
               >
                 {breathingActive ? (
                   <>
-                    <Pause size={18} /> Stop Guide
+                    <Pause size={18} aria-hidden="true" /> Stop Guide
                   </>
                 ) : (
                   <>
-                    <Play size={18} /> Start Guide
+                    <Play size={18} aria-hidden="true" /> Start Guide
                   </>
                 )}
               </button>
@@ -905,14 +1018,15 @@ export default function App() {
                   disabled={isGeneratingExercise}
                   className="primary-btn"
                   style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                  aria-label="Generate custom mindfulness exercise using AI"
                 >
                   {isGeneratingExercise ? (
                     <>
-                      <div className="loading-spinner" style={{ width: '14px', height: '14px' }} /> Generating...
+                      <div className="loading-spinner" style={{ width: '14px', height: '14px' }} aria-hidden="true" /> Generating...
                     </>
                   ) : (
                     <>
-                      <RefreshCw size={14} /> AI Custom Exercise
+                      <RefreshCw size={14} aria-hidden="true" /> AI Custom Exercise
                     </>
                   )}
                 </button>
@@ -928,6 +1042,14 @@ export default function App() {
                     key={ex.id} 
                     className="exercise-item"
                     onClick={() => setActiveExerciseModal(ex)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        setActiveExerciseModal(ex);
+                      }
+                    }}
+                    aria-label={`View exercise: ${ex.title}, Type: ${ex.type}, Duration: ${ex.duration} minutes`}
                   >
                     <div className="exercise-info">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -936,8 +1058,8 @@ export default function App() {
                       </div>
                       <span className="exercise-desc">{ex.description}</span>
                     </div>
-                    <button className="icon-btn-circle">
-                      <ChevronRight size={16} />
+                    <button className="icon-btn-circle" tabIndex={-1} aria-hidden="true">
+                      <ChevronRight size={16} aria-hidden="true" />
                     </button>
                   </div>
                 ))}
@@ -948,7 +1070,7 @@ export default function App() {
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="glass-card">
+          <div role="tabpanel" id="settings-tabpanel" aria-labelledby="settings-tab" className="glass-card">
             <h3 className="card-title">Settings & Data Integrity</h3>
             <div className="settings-form">
               
@@ -963,6 +1085,7 @@ export default function App() {
                   onClick={handleClearData} 
                   className="primary-btn" 
                   style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', boxShadow: 'none' }}
+                  aria-label="Clear all local journal and chat history data"
                 >
                   Clear Journal & Chat History
                 </button>
@@ -976,12 +1099,12 @@ export default function App() {
 
       {/* MINDFULNESS MODAL PANEL */}
       {activeExerciseModal && (
-        <div className="modal-overlay">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
           <div className="modal-content">
-            <button className="modal-close-btn" onClick={() => setActiveExerciseModal(null)}>
-              <X size={20} />
+            <button className="modal-close-btn" onClick={() => setActiveExerciseModal(null)} aria-label="Close mindfulness exercise modal">
+              <X size={20} aria-hidden="true" />
             </button>
-            <h4 className="modal-title">{activeExerciseModal.title}</h4>
+            <h4 id="modal-title" className="modal-title">{activeExerciseModal.title}</h4>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
               {activeExerciseModal.description} ({activeExerciseModal.duration} min session)
             </p>
@@ -999,6 +1122,7 @@ export default function App() {
               className="primary-btn"
               onClick={() => setActiveExerciseModal(null)}
               style={{ width: '100%' }}
+              aria-label="Conclude exercise and close modal"
             >
               Conclude Exercise
             </button>

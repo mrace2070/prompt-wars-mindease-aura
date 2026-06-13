@@ -11,6 +11,9 @@ export async function checkApiKeyValidity(
   _apiKey?: string,
   _model?: string
 ): Promise<{ isValid: boolean; error?: string }> {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_API_KEY') || GEMINI_API_KEY.trim() === '') {
+    return { isValid: false, error: 'API key is missing or not set in environment variables.' };
+  }
   try {
     const response = await fetch(`${getGeminiUrl()}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -52,10 +55,15 @@ export async function analyzeJournalEntry(
   _apiKey?: string,
   text: string = '',
   mood: string = 'neutral',
+  examType: string = 'JEE',
   _model?: string
 ): Promise<JournalAnalysis> {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_API_KEY') || GEMINI_API_KEY.trim() === '') {
+    console.warn('Gemini API key is not configured. Falling back to mock analysis.');
+    return getMockAnalysis(mood);
+  }
   const prompt = `You are a compassionate, professional AI wellness counselor specialized in supporting students during high-stakes board exams and competitive entrance tests (e.g. JEE, NEET, UPSC, GATE, CAT, board exams).
-Analyze the following student's journal entry.
+Analyze the following student's journal entry. They are preparing for the ${examType} exam.
 Journal Entry: "${text}"
 Mood reported: "${mood}"
 
@@ -113,8 +121,13 @@ export async function getCompanionResponse(
   _apiKey?: string,
   chatHistory: Message[] = [],
   recentEntries: MoodEntry[] = [],
+  examType: string = 'JEE',
   _model?: string
 ): Promise<string> {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_API_KEY') || GEMINI_API_KEY.trim() === '') {
+    console.warn('Gemini API key is not configured. Falling back to default companion response.');
+    return "I am here for you. Although I'm in offline support mode right now, please know that you are doing your absolute best. Take a deep breath and take one task at a time.";
+  }
   // Format context
   const journalContext = recentEntries.length > 0
     ? `Recent Journal Entries for context:\n${recentEntries.map(e => `- Date: ${e.date}, Mood: ${e.mood}, Journal: "${e.journalText}"${e.analysis ? `, Triggers: ${e.analysis.hiddenTriggers.join(', ')}` : ''}`).join('\n')}`
@@ -122,7 +135,7 @@ export async function getCompanionResponse(
 
   const formattedHistory = chatHistory.map(m => `${m.sender === 'user' ? 'Student' : 'Aura'}: ${m.text}`).join('\n');
 
-  const systemInstruction = `You are Aura, an empathetic, safe, and always-available digital companion for a student preparing for intense competitive exams like JEE, NEET, UPSC, CAT, etc. You understand the pressure, self-doubt, syllabus load, parent pressure, and exhaustion they experience.
+  const systemInstruction = `You are Aura, an empathetic, safe, and always-available digital companion for a student preparing for the intense competitive exam: ${examType}. You understand the pressure, self-doubt, syllabus load, parent pressure, and exhaustion they experience specifically preparing for ${examType}.
 Your tone is warm, non-judgmental, friendly, and deeply caring.
 Here is the context of their recent journal entries:
 ${journalContext}
@@ -163,10 +176,15 @@ export async function generateMindfulnessExercise(
   _apiKey?: string,
   mood: string = 'neutral',
   triggers: string[] = [],
+  examType: string = 'JEE',
   _model?: string
 ): Promise<MindfulnessExercise> {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_API_KEY') || GEMINI_API_KEY.trim() === '') {
+    console.warn('Gemini API key is not configured. Falling back to mock exercise.');
+    return getMockExercise(mood);
+  }
   const triggersText = triggers.length > 0 ? triggers.join(', ') : 'general exam pressure';
-  const prompt = `You are a meditation and mindfulness expert. Design a simple, custom mindfulness or grounding exercise for a student.
+  const prompt = `You are a meditation and mindfulness expert. Design a simple, custom mindfulness or grounding exercise for a student preparing for the ${examType} exam.
 Their current mood is: "${mood}"
 Their active stress triggers are: "${triggersText}"
 
